@@ -1,0 +1,1440 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<title>Lapor Status ALOPTAMA</title>
+	
+	<link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="static_peralatan/css/leaflet.css"/>
+    <script src="static_peralatan/js/leaflet.js"></script>
+    <link rel="stylesheet" href="static_peralatan/css/leaflet-sidebar.css" />
+    <script src="static_peralatan/js/leaflet-sidebar.js"></script>
+
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+            overflow-y: hidden;
+		}
+		.leaflet-container {
+			height: 400px;
+			width: 600px;
+			max-width: 100%;
+			max-height: 100%;
+		}
+
+          /** Modal */
+  .modal {
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    position: absolute;
+    top: 10px;
+    left: 0;
+    right: 0;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 30px;
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  }
+  .modal-close-btn {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 20px;
+  }
+  
+  /** Overlay */
+  .overlay {
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.3);
+  }
+  
+  /** JS */
+  .is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 90000;
+  }
+
+	</style>
+
+	<style>body { padding: 0; margin: 0; } #map { height: 100%; width: 100vw; }</style>
+</head>
+<body>
+
+<!-- optionally define the sidebar content via HTML markup -->
+<div id="sidebar" class="leaflet-sidebar collapsed">
+
+    <!-- nav tabs -->
+    <div class="leaflet-sidebar-tabs">
+        <!-- top aligned tabs -->
+        <ul role="tablist">
+            <li><a href="#home" role="tab"><i class="fa fa-gear"></i></a></li> <!-- fa fa-info-circle -->
+            <li><a href="#autopan" role="tab"><i class="fa fa-database"></i></a></li>
+            <li><a href="logout"><i class="fas fa-sign-out-alt"></i></a></li>
+        </ul>
+    </div>
+
+    <!-- panel content -->
+    <div class="leaflet-sidebar-content">
+        <div class="leaflet-sidebar-pane" id="home" style="overflow-x:scroll">
+            <h1 class="leaflet-sidebar-header">
+                Update
+                <span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span>
+            </h1>
+
+            <h2 id="nama_stasiun">Update Data Peralatan</h2>
+            <h3 id="nama_stasiun">Situs</h3>
+            <select name="situs" id="situs" onchange="update_set_alat_kompleks();">
+                {{range .all_situs}}
+                <option value="{{.Kode_situs}}">{{.Kode_situs}} - {{.Nama_situs}}</option>
+                {{end}}
+            </select>
+            <div id="list_opsi_alat_kompleks"></div>
+            <div id="list_opsi_alat"></div>
+            <button id="update" onclick="update_to_db()" type="submit" class="btn btn-link text-primary">Update</button>
+            <h3 id="status_update"></h3>
+
+        </div>
+
+        <div class="leaflet-sidebar-pane" id="autopan">
+            <h1 class="leaflet-sidebar-header">
+                Extract Data
+                <span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span>
+            </h1>
+            {{if .is_admin}}
+            <div>
+                <h2><a href="#">Download</a> status AWOS terbaru</h2>
+            </div>
+            <div>
+                <h2>Ekstrak Data Historis Keadaan Peralatan</h2>
+            </div>
+            <div> 
+                <p id="text">Pilih awal waktu</p> 
+                 <input class="form-control" type="text" id="datepicker_awal_waktu"> 
+            </div>
+            <div> 
+                <p id="text">Pilih akhir waktu</p> 
+                 <input class="form-control" type="text" id="datepicker_akhir_waktu"> 
+            </div>
+            <br>
+            <div>
+                <button id="button-addon1" type="submit" onclick="extract_data();" class="btn btn-link text-primary">Ekstrak</button>
+            </div>
+            <div>
+                <a id="a_link_extract_data" href=""><p id="link_extract_data"></p></a>
+            </div>
+            <div>
+                <h2>Ekstrak Data Peralatan Situasi Terkini</h2>
+            </div>
+            <div>
+                <button id="button-addon1" type="submit" onclick="extract_data_terbaru();" class="btn btn-link text-primary">Ekstrak</button>
+            </div>
+            <div>
+                <a id="a_link_extract_data_terbaru" href=""><p id="link_extract_data_terbaru"></p></a>
+            </div>
+            {{else}}
+                <h1>ONLY FOR ADMIN</h1>
+            {{end}}
+        </div>
+
+        <div class="leaflet-sidebar-pane" id="messages">
+            <h1 class="leaflet-sidebar-header">Messages<span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span></h1>
+        </div>
+    </div>
+</div>
+
+<div id='map'></div>
+
+<div id="daftar_alat" style="visibility:hidden;display:inline;">{{range .all_jenis_alat}}{{.Kode_alat}},{{end}}</div>
+<div id="nama_alat" style="visibility:hidden;display:inline;">{{range .all_jenis_alat}}{{.Nama_alat}},{{end}}</div>
+<div id="detail_alat_kompleks" style="visibility:hidden;display:inline;">{{.data_alat_kompleks}}</div>
+<div id="detail_alat" style="visibility:hidden;display:inline;">{{.data_alat}}</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="modal" id="modal" style="overflow-y: scroll; height: 75%;">
+  <button class="modal-close-btn" id="close-btn"><i class="fa fa-times" title="close"></i></button>
+  <div id="modal_status_alat">
+
+  </div>
+</div>
+
+<script>
+
+function markerOnClick() {
+    var list_alat_str = document.getElementById("daftar_alat").innerHTML
+    list_alat_str = list_alat_str.split(",")
+
+    var list_alat = []
+    for (var i = 0; i < list_alat_str.length; i++) {
+        if (list_alat_str[i] == "") {
+            continue
+        }
+        list_alat.push(list_alat_str[i]);
+    }
+    var kode = this.options.kode_situs
+    console.log(alldata_json)
+    document.getElementById('modal_kode_stasiun').innerHTML = kode
+
+    var div_status = document.getElementById("modal_status_alat")
+    div_status.innerHTML = ""
+
+    var modal_table_utama = document.createElement("table")
+    modal_table_utama.setAttribute("border", "1px solid black")
+    for (var i = 0; i < list_alat.length; i++) {
+        var tr = document.createElement("tr")
+        var td = document.createElement("td")
+        td.setAttribute("colspan", "2")
+        td.innerHTML = "<b>"+ list_alat[i]+"</b>"
+        tr.appendChild(td)
+        modal_table_utama.appendChild(tr)
+        var jumlah_status = 0
+        if (alldata_json[kode]['jumlah'][i] <= 5) {
+            jumlah_status = alldata_json[kode]['jumlah'][i]
+        } else {
+            jumlah_status = 5
+        }
+
+        for (var ii = 0; ii < jumlah_status; ii++) {
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Merk "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML = alldata_json[kode]['merk'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Tahun Pengadaan "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML =alldata_json[kode]['tahun_pengadaan'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Tahun Kalibrasi "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML =alldata_json[kode]['tahun_kalibrasi'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Status "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML = alldata_json[kode]['status_list'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Performa "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML = alldata_json[kode]['performa'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+            var tr = document.createElement("tr")
+            var td = document.createElement("td")
+            td.innerHTML = "Keterangan "+list_alat[i]+" ("+parseInt(ii+1)+")"
+            tr.appendChild(td)
+            var td = document.createElement("td")
+            try {
+                td.innerHTML = alldata_json[kode]['ket_list'][i][ii]
+            } catch (err) {
+                td.innerHTML = "-"
+            }
+            tr.appendChild(td)
+            modal_table_utama.appendChild(tr)
+
+        }
+    }
+    div_status.appendChild(modal_table_utama)
+
+    document.getElementById('overlay').classList.add('is-visible')
+    document.getElementById('modal').classList.add('is-visible')
+}
+
+
+function update_peta() {
+	var list_situs = []
+	var list_lintang = []
+	var list_bujur = []
+	var list_alat = []
+	var list_status_alat = []
+	var list_keterangan_alat = []
+
+	var situs_marker = []
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			var alldata = this.responseText
+			var alldata_json = JSON.parse(alldata);
+			var keys = Object.keys(alldata_json);
+
+            var situs_all = alldata_json['list_situs']
+            console.log('situs', situs_all)
+            for (var i=0; i<situs_all.length; i++) {
+                list_situs.push(situs_all[i]["Kode_situs"])
+				list_lintang.push(situs_all[i]["Lintang"])
+				list_bujur.push(situs_all[i]["Bujur"])
+
+                situs_marker.push(L.marker([list_lintang[i], list_bujur[i]], {icon: icon_kantor_update, "kode_situs": situs_all[i]["Kode_situs"]}).on('click', click_site));
+				situs_marker[(situs_marker.length)-1].addTo(info_kantor_update);
+            }
+            info_kantor_update.addTo(mymap)
+			
+			/*var d = new Date()
+			waktu_utc_hari_ini = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+			for (var i=0; i<keys.length; i++) {
+				list_situs.push(keys[i])
+				list_lintang.push(alldata_json[keys[i]]["lintang"])
+				list_bujur.push(alldata_json[keys[i]]["bujur"])
+				list_alat.push([])
+				list_status_alat.push([])
+				list_keterangan_alat.push([])
+				for (var j=0; j<alldata_json[keys[i]]["nama_alat_list"].length; j++) {
+					list_alat[i].push(alldata_json[keys[i]]["nama_alat_list"][j])
+					list_status_alat[i].push(alldata_json[keys[i]]["status_alat_list"][j])
+					list_keterangan_alat[i].push(alldata_json[keys[i]]["keterangan_alat_list"][j])
+				}
+				
+				
+				var waktu_update_alat = new Date(alldata_json[keys[i]]['insert_time'].substring(0, 4), 
+				alldata_json[keys[i]]['insert_time'].substring(5, 7)-1, alldata_json[keys[i]]['insert_time'].substring(8, 10),
+				alldata_json[keys[i]]['insert_time'].substring(11, 13), alldata_json[keys[i]]['insert_time'].substring(14, 16))
+				
+				if (waktu_update_alat > waktu_utc_hari_ini) {
+					situs_marker.push(L.marker([list_lintang[i], list_bujur[i]], {icon: icon_kantor_update, "kode_situs": keys[i]}).on('click', click_site));
+					situs_marker[(situs_marker.length)-1].addTo(info_kantor_update);
+				} else {
+					situs_marker.push(L.marker([list_lintang[i], list_bujur[i]], {icon: icon_kantor_tidak_update, "kode_situs": keys[i]}).on('click', click_site));
+					situs_marker[(situs_marker.length)-1].addTo(info_kantor_tidak_update);
+				}*/
+				
+				
+				/*var popup_teks = ""
+				popup_teks += "<b>"+list_situs[i]+"</b>"+"<br>"
+				popup_teks += "keterangan:<br>"
+				popup_teks += "<div style='overflow:scroll;'><table>"
+				for (var j=0; j<alldata_json[keys[i]]["nama_alat_list"].length; j++) {
+					popup_teks += "<tr><td>Status <b>"+list_alat[i][j]+"</b></td><td>:</td> <td>"+list_status_alat[i][j]+"</td></tr>"
+					popup_teks += "<tr><td>Keterangan <b>"+list_alat[i][j]+"</b></td><td>:</td> <td>"+list_keterangan_alat[i][j]+"</td></tr>"
+					popup_teks += "<tr><td></td></tr>"
+				}
+				popup_teks += "<tr><td></td></tr>"
+				popup_teks += "</table>"
+				popup_teks += "diperbaharui terakhir pada <b>"+alldata_json[keys[i]]['insert_time']+"</b>"
+				popup_teks += "</div>"
+				situs_marker[i].bindPopup(popup_teks)
+			}*/
+			/*mymap.eachLayer(function (layer) {
+				if (layer.options.status !== "BASE_LAYER") {
+					mymap.removeLayer(layer);
+				}
+			});
+			info_kantor_update.addTo(mymap)
+			info_kantor_tidak_update.addTo(mymap)*/
+		}
+	};
+	
+	//xhttp.open("GET", "get_data_peta", true);
+    xhttp.open("GET", "get_data_peta_new", true);
+	xhttp.send();
+}
+
+var info_kantor = L.layerGroup();
+var icon_kantor = L.icon({
+	iconUrl: 'static_peralatan/img/kantor.png',
+
+	iconSize:	 [15, 15], // size of the icon
+	iconAnchor:   [8, 8], // point of the icon which will correspond to marker's location
+	popupAnchor:  [6, 0] // point from which the popup should open relative to the iconAnchor
+});
+
+var info_kantor_update = L.layerGroup();
+var icon_kantor_update = L.icon({
+	iconUrl: 'static_peralatan/img/kantor_update.png',
+
+	iconSize:	 [15, 15], // size of the icon
+	iconAnchor:   [8, 8], // point of the icon which will correspond to marker's location
+	popupAnchor:  [6, 0] // point from which the popup should open relative to the iconAnchor
+});
+
+var info_kantor_tidak_update = L.layerGroup();
+var icon_kantor_tidak_update = L.icon({
+	iconUrl: 'static_peralatan/img/kantor_tidak_update.png',
+
+	iconSize:	 [15, 15], // size of the icon
+	iconAnchor:   [8, 8], // point of the icon which will correspond to marker's location
+	popupAnchor:  [6, 0] // point from which the popup should open relative to the iconAnchor
+});
+
+var mymap = L.map('map').setView([0, 120], 5);
+
+var Stadia_AlidadeSmoothDark = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+	maxZoom: 20,
+	attribution: '&copy; by Genomexyz',
+	status: 'BASE_LAYER'
+	});
+	
+	Stadia_AlidadeSmoothDark.addTo(mymap);
+
+var popup = L.popup();
+
+	function onMapClick(e) {
+		popup
+			.setLatLng(e.latlng)
+			.setContent("Koordinat: " + e.latlng.toString())
+			.openOn(mymap);
+	}
+
+// create the sidebar instance and add it to the map
+		var sidebar = L.control.sidebar({ container: 'sidebar' })
+			.addTo(mymap)
+			.open('home');
+
+		// be notified when a panel is opened
+		sidebar.on('content', function (ev) {
+			switch (ev.id) {
+				case 'autopan':
+				sidebar.options.autopan = true;
+				break;
+				default:
+				sidebar.options.autopan = false;
+			}
+		});
+
+		var userid = 0
+		function addUser() {
+			sidebar.addPanel({
+				id:   'user' + userid++,
+				tab:  '<i class="fa fa-user"></i>',
+				title: 'User Profile ' + userid,
+				pane: '<p>user ipsum dolor sit amet</p>',
+			});
+		}
+
+	mymap.on('click', onMapClick);
+
+update_peta();
+</script>
+
+
+
+
+
+
+<script>
+
+var alldata_alat
+var dict_kode_nama_alat = {}
+var dict_kode_iter = {}
+
+var list_status = ['on', 'off']
+var list_status_text = ['nyala', 'mati']
+
+function update_set_alat_kompleks(mode_update = false) {
+    var default_jumlah = 0
+    var default_jumlah_site = 1
+
+    var div_induk = document.getElementById('list_opsi_alat_kompleks')
+    div_induk.innerHTML = ''
+    var string_data_alat_kompleks = document.getElementById('detail_alat_kompleks').innerHTML
+    var data_alat_kompleks = JSON.parse(string_data_alat_kompleks)
+    alldata_alat = data_alat_kompleks
+    for (var iter_alat = 0; iter_alat < data_alat_kompleks.length; iter_alat++) {
+        dict_kode_nama_alat[data_alat_kompleks[iter_alat]['Kode_alat']] = data_alat_kompleks[iter_alat]['Nama_alat']
+    }
+    console.log(data_alat_kompleks)
+
+    //generate input
+    for (var iter_alat = 0; iter_alat < data_alat_kompleks.length; iter_alat++) {
+        var nama_sensor_alat = data_alat_kompleks[iter_alat]['Nama_alat']
+        var kode_sensor_alat = data_alat_kompleks[iter_alat]['Kode_alat']
+        var kategori_sensor = data_alat_kompleks[iter_alat]['List_jenis']
+        var list_data_sensor = data_alat_kompleks[iter_alat]['List_sensor']
+
+        dict_kode_iter[kode_sensor_alat] = iter_alat
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Jumlah Site ${nama_sensor_alat}`
+        div_induk.appendChild(h3)
+
+        var select = document.createElement("select")
+        select.name = `${kode_sensor_alat}_jumlah_kompleks`
+        select.id = `${kode_sensor_alat}_jumlah_kompleks`
+
+        for (var iter_opsi = 0; iter_opsi < 6; iter_opsi++) {
+            var opsi = document.createElement("option")
+            opsi.value = iter_opsi
+            opsi.innerHTML = iter_opsi
+            select.appendChild(opsi)
+        }
+        select.value = default_jumlah
+        select.setAttribute('onChange', `set_jumlah_alat_kompleks('${kode_sensor_alat}', '${nama_sensor_alat}', ${iter_alat})`)
+        div_induk.appendChild(select)
+
+        var div_ket = document.createElement("div")
+        div_ket.id = 'list_keterangan_alat_kompleks'
+        div_ket.name = 'list_keterangan_alat_kompleks'
+
+        //generate all portion of input
+        var div_merk = document.createElement("div")
+        div_merk.id = `${kode_sensor_alat}_div_merk_kompleks`
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Merk ${nama_sensor_alat}`
+        div_merk.appendChild(h3)
+
+        for (var iter_input = 0; iter_input < default_jumlah; iter_input++) {
+            var input = document.createElement("input")
+            input.name = `${kode_sensor_alat}_${iter_input}_merk_kompleks`
+            input.id = `${kode_sensor_alat}_${iter_input}_merk_kompleks`
+            input.type = "text"
+            div_merk.appendChild(input)
+            if (iter_input != default_jumlah-1) {
+                var br = document.createElement("br")
+                div_merk.appendChild(br)
+            }
+        }
+        div_ket.appendChild(div_merk)
+
+        
+        var div_kategori = document.createElement("div")
+        div_kategori.id = `${kode_sensor_alat}_div_kategori_kompleks`
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Kategori ${nama_sensor_alat}`
+        div_kategori.appendChild(h3)
+
+        for (var iter_input = 0; iter_input < default_jumlah; iter_input++) {
+            var select = document.createElement("select")
+            select.name = `${kode_sensor_alat}_${iter_input}_kategori_kompleks`
+            select.id = `${kode_sensor_alat}_${iter_input}_kategori_kompleks`
+            for (var iter_opsi = 0; iter_opsi < kategori_sensor.length; iter_opsi++) {
+                var opsi = document.createElement("option")
+                opsi.value = kategori_sensor[iter_opsi]
+                opsi.innerHTML = kategori_sensor[iter_opsi]
+                select.appendChild(opsi)
+            }
+            div_kategori.appendChild(select)
+            if (iter_input != default_jumlah-1) {
+                var br = document.createElement("br")
+                div_kategori.appendChild(br)
+            }
+        }
+        div_ket.appendChild(div_kategori)
+
+        var div_status_alat = document.createElement("div")
+        div_status_alat.id = `${kode_sensor_alat}_div_status_kompleks`
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Status ${nama_sensor_alat}`
+        div_status_alat.appendChild(h3)
+
+        for (var iter_input = 0; iter_input < default_jumlah; iter_input++) {
+            var select = document.createElement("select")
+            select.name = `${kode_sensor_alat}_${iter_input}_status_kompleks`
+            select.id = `${kode_sensor_alat}_${iter_input}_status_kompleks`
+            for (var iter_opsi = 0; iter_opsi < list_status.length; iter_opsi++) {
+                var opsi = document.createElement("option")
+                opsi.value = list_status[iter_opsi]
+                opsi.innerHTML = list_status_text[iter_opsi]
+                select.appendChild(opsi)
+            }
+            div_status_alat.appendChild(select)
+            if (iter_input != default_jumlah-1) {
+                var br = document.createElement("br")
+                div_status_alat.appendChild(br)
+            }
+        }
+        div_ket.appendChild(div_status_alat)
+
+        var div_keterangan = document.createElement("div")
+        div_keterangan.id = `${kode_sensor_alat}_div_keterangan_kompleks`
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Keterangan ${nama_sensor_alat}`
+        div_keterangan.appendChild(h3)
+
+        for (var iter_input = 0; iter_input < default_jumlah; iter_input++) {
+            var input = document.createElement("input")
+            input.name = `${kode_sensor_alat}_${iter_input}_keterangan_kompleks`
+            input.id = `${kode_sensor_alat}_${iter_input}_keterangan_kompleks`
+            input.type = "text"
+            div_keterangan.appendChild(input)
+            if (iter_input != default_jumlah-1) {
+                var br = document.createElement("br")
+                div_keterangan.appendChild(br)
+            }
+        }
+        div_ket.appendChild(div_keterangan)
+
+        var div_performa = document.createElement("div")
+        div_performa.id = `${kode_sensor_alat}_div_performa_kompleks`
+
+        for (var iter_input = 0; iter_input < default_jumlah; iter_input++) {
+            var h3 = document.createElement("h3")
+            h3.innerHTML = `Jumlah site komponen ${nama_sensor_alat}  ${iter_input+1}`
+            div_performa.appendChild(h3)
+
+            var select = document.createElement("select")
+            select.name = `${kode_sensor_alat}_${iter_input}_jumlah_site_kompleks`
+            select.id = `${kode_sensor_alat}_${iter_input}_jumlah_site_kompleks`
+
+            for (var iter_opsi = 1; iter_opsi < 6; iter_opsi++) {
+                var opsi = document.createElement("option")
+                opsi.value = iter_opsi
+                opsi.innerHTML = iter_opsi
+                select.appendChild(opsi)
+            }
+            select.value = default_jumlah_site
+            select.setAttribute('onChange', `set_jumlah_site('${kode_sensor_alat}',${iter_input}, ${iter_alat})`)
+            div_performa.appendChild(select)
+
+            var div_inner_sensor = document.createElement("div")
+            div_inner_sensor.style.border = '2px solid black'
+            div_inner_sensor.style.borderRadius = '5px'
+            div_inner_sensor.id = `${kode_sensor_alat}_${iter_input}_div_inner_performa_sensor_alat_kompleks`
+            for (var iter_sensor = 0; iter_sensor < list_data_sensor.length; iter_sensor++) {
+                var single_nama_sensor = list_data_sensor[iter_sensor]['Nama_alat']
+                var single_kode_sensor = list_data_sensor[iter_sensor]['Kode_alat']
+
+                var h3 = document.createElement("h3")
+                h3.innerHTML = `Performa ${single_nama_sensor}`
+                div_inner_sensor.appendChild(h3)
+
+                for (var iter_inner_input = 0; iter_inner_input < default_jumlah_site; iter_inner_input++) {
+                    var input = document.createElement("input")
+                    input.name = `${kode_sensor_alat}_${iter_input}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+                    input.id = `${kode_sensor_alat}_${iter_input}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+                    input.type = 'number'
+                    input.min = -1
+                    input.max = 100
+                    div_inner_sensor.appendChild(input)
+                }
+
+
+            }
+
+            div_performa.appendChild(div_inner_sensor)
+
+        }
+        div_ket.appendChild(div_performa)
+        div_induk.appendChild(div_ket)
+    }
+    //end generate input
+
+    //begin get data
+    var situs_marker = []
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			var alldata = this.responseText
+            var full_alldata_json = JSON.parse(alldata)
+            var alldata_json = full_alldata_json['data']
+            var stat_alldata = full_alldata_json['stat_alat']
+
+            console.log("cek data alat terpilih", alldata_json)
+
+            var checklist_set_jumlah = {}
+            for (var iter_alldata = 0; iter_alldata < alldata_json.length; iter_alldata++) {
+                var kode_alat_kompleks = alldata_json[iter_alldata]['Kode_alat']
+                checklist_set_jumlah[kode_alat_kompleks] = 'belum'
+            }
+            for (var iter_alldata = 0; iter_alldata < alldata_json.length; iter_alldata++) {
+                var urutan_alat = alldata_json[iter_alldata]['Urutan']
+                var kode_alat_kompleks = alldata_json[iter_alldata]['Kode_alat']
+                var merk_alat_kompleks = alldata_json[iter_alldata]['Merk']
+                var kategori_alat_kompleks = alldata_json[iter_alldata]['Kategori']
+                var status_alat_kompleks = alldata_json[iter_alldata]['Status']
+                var keterangan_alat_kompleks = alldata_json[iter_alldata]['Keterangan']
+                var jumlah_site_alat_kompleks = alldata_json[iter_alldata]['Jumlah_site']
+                var list_performa_alat_kompleks = alldata_json[iter_alldata]['Performa_list']
+
+                console.log('performa', list_performa_alat_kompleks)
+
+                var nama_alat_kompleks = ''
+                try {
+                    nama_alat_kompleks = dict_kode_nama_alat[kode_alat_kompleks]
+                } catch (err) {
+                    console.log('iter kode nama tak ditemukan karena kodenya', kode_alat_kompleks)
+                    continue
+                }
+                
+                var iter_urutan_alat
+                try {
+                    iter_urutan_alat = dict_kode_iter[kode_alat_kompleks]
+                } catch (err) {
+                    console.log('iter urutan alat tak ditemukan karena kodenya', kode_alat_kompleks)
+                    continue
+                }
+
+                if (checklist_set_jumlah[kode_alat_kompleks] == 'belum') {
+                    var select = document.getElementById(`${kode_alat_kompleks}_jumlah_kompleks`)
+                    select.value = stat_alldata[kode_alat_kompleks]
+                    set_jumlah_alat_kompleks(kode_alat_kompleks, nama_alat_kompleks, iter_urutan_alat)
+                    checklist_set_jumlah[kode_alat_kompleks] = 'sudah'
+                }
+
+
+                try {
+                    var input = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_merk_kompleks`)
+                    input.value = merk_alat_kompleks
+                } catch (err) {
+                    console.log('err, filling input')
+                }
+
+                try {
+                    var select = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_kategori_kompleks`)
+                    select.value = kategori_alat_kompleks
+                } catch (err) {
+                    console.log('err, filling input')
+                }
+
+                try {
+                    var select = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_status_kompleks`)
+                    select.value = status_alat_kompleks
+                } catch (err) {
+                    console.log('err, filling input')
+                }
+                
+
+                try {
+                    var input = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_keterangan_kompleks`)
+                    input.value = keterangan_alat_kompleks
+                } catch (err) {
+                    console.log('err, filling input')
+                }
+                
+
+                if (jumlah_site_alat_kompleks > 5) {
+                    jumlah_site_alat_kompleks = 5
+                } else if (jumlah_site_alat_kompleks < 0) {
+                    jumlah_site_alat_kompleks = 0
+                }
+
+                var select = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_jumlah_site_kompleks`)
+                select.value = jumlah_site_alat_kompleks
+                set_jumlah_site(kode_alat_kompleks, urutan_alat, iter_urutan_alat)
+
+                for (var iter_performa = 0; iter_performa < list_performa_alat_kompleks.length; iter_performa++) {
+                    var kode_sensor = list_performa_alat_kompleks[iter_performa]['Kode_alat']
+                    var list_val_performa = list_performa_alat_kompleks[iter_performa]['Performa']
+                    for (var iter_performa_val = 0; iter_performa_val < jumlah_site_alat_kompleks; iter_performa_val++) {
+                        try {
+                            var input = document.getElementById(`${kode_alat_kompleks}_${urutan_alat}_${kode_sensor}_${iter_performa_val}_nilai_performa_kompleks`)
+                            input.value = list_val_performa[iter_performa_val]
+                        } catch (err) {
+                            continue
+                        }
+                    }
+                }
+                
+
+            }
+        }
+    }
+
+    var kode_situs_selected = document.getElementById('situs').value
+    xhttp.open("GET", `get_data_alat/${kode_situs_selected}`, true);
+	xhttp.send();
+}
+
+function set_jumlah_site(kode_alat_kompleks, urutan_sensor, urutan_alat_kompleks) {
+    var jumlah_site = document.getElementById(`${kode_alat_kompleks}_${urutan_sensor}_jumlah_site_kompleks`).value
+    //console.log('urutan sensor dan jumlah site adalah', urutan_sensor, jumlah_site, urutan_alat_kompleks)
+    //console.log('param =>', kode_alat_kompleks, urutan_sensor, urutan_alat_kompleks)
+
+    var div_performa_sensor = document.getElementById(`${kode_alat_kompleks}_${urutan_sensor}_div_inner_performa_sensor_alat_kompleks`)
+    div_performa_sensor.innerHTML = ''
+
+    var list_data_sensor = alldata_alat[urutan_alat_kompleks]['List_sensor']
+    for (var iter_site = 0; iter_site < list_data_sensor.length; iter_site++) {
+        var single_nama_sensor = list_data_sensor[iter_site]['Nama_alat']
+        var single_kode_sensor = list_data_sensor[iter_site]['Kode_alat']
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Performa ${single_nama_sensor}`
+        div_performa_sensor.appendChild(h3)
+
+        for (var iter_inner_input = 0; iter_inner_input < jumlah_site; iter_inner_input++) {
+            var input = document.createElement("input")
+            input.name = `${kode_alat_kompleks}_${urutan_sensor}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+            input.id = `${kode_alat_kompleks}_${urutan_sensor}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+            input.type = 'number'
+            input.min = 0
+            input.max = 100
+            div_performa_sensor.appendChild(input)
+        }
+    }
+}
+
+function set_jumlah_alat_kompleks(kode_alat, nama_alat, urutan_alat_kompleks) {
+    var default_jumlah_site = 1
+
+    var jumlah_alat = document.getElementById(`${kode_alat}_jumlah_kompleks`).value
+    var kategori_sensor = alldata_alat[urutan_alat_kompleks]['List_jenis']
+    var list_data_sensor = alldata_alat[urutan_alat_kompleks]['List_sensor']
+    
+    var div = document.getElementById(`${kode_alat}_div_merk_kompleks`)
+    div.innerHTML = ''
+
+    var h3 = document.createElement("h3")
+    h3.innerHTML = `Merk ${nama_alat}`
+    div.appendChild(h3)
+    for (var iter_input = 0; iter_input < jumlah_alat; iter_input++) {
+        var input = document.createElement("input")
+        input.name = `${kode_alat}_${iter_input}_merk_kompleks`
+        input.id = `${kode_alat}_${iter_input}_merk_kompleks`
+        input.type = "text"
+        div.appendChild(input)
+        if (iter_input != jumlah_alat-1) {
+            var br = document.createElement("br")
+            div.appendChild(br)
+        }
+    }
+
+    var div = document.getElementById(`${kode_alat}_div_kategori_kompleks`)
+    div.innerHTML = ''
+
+    var h3 = document.createElement("h3")
+    h3.innerHTML = `Kategori ${nama_alat}`
+    div.appendChild(h3)
+
+    for (var iter_input = 0; iter_input < jumlah_alat; iter_input++) {
+        var select = document.createElement("select")
+        select.name = `${kode_alat}_${iter_input}_kategori_kompleks`
+        select.id = `${kode_alat}_${iter_input}_kategori_kompleks`
+        for (var iter_opsi = 0; iter_opsi < kategori_sensor.length; iter_opsi++) {
+            var opsi = document.createElement("option")
+            opsi.value = kategori_sensor[iter_opsi]
+            opsi.innerHTML = kategori_sensor[iter_opsi]
+            select.appendChild(opsi)
+        }
+        div.appendChild(select)
+        if (iter_input != jumlah_alat-1) {
+            var br = document.createElement("br")
+            div.appendChild(br)
+        }
+    }
+
+
+    var div = document.getElementById(`${kode_alat}_div_status_kompleks`)
+    div.innerHTML = ''
+
+    var h3 = document.createElement("h3")
+    h3.innerHTML = `Status ${nama_alat}`
+    div.appendChild(h3)
+
+    for (var iter_input = 0; iter_input < jumlah_alat; iter_input++) {
+        var select = document.createElement("select")
+        select.name = `${kode_alat}_${iter_input}_status_kompleks`
+        select.id = `${kode_alat}_${iter_input}_status_kompleks`
+        for (var iter_opsi = 0; iter_opsi < list_status.length; iter_opsi++) {
+            var opsi = document.createElement("option")
+            opsi.value = list_status[iter_opsi]
+            opsi.innerHTML = list_status_text[iter_opsi]
+            select.appendChild(opsi)
+        }
+        div.appendChild(select)
+        if (iter_input != jumlah_alat-1) {
+            var br = document.createElement("br")
+            div.appendChild(br)
+        }
+    }
+
+    var div = document.getElementById(`${kode_alat}_div_keterangan_kompleks`)
+    div.innerHTML = ''
+
+    var h3 = document.createElement("h3")
+    h3.innerHTML = `Keterangan ${nama_alat}`
+    div.appendChild(h3)
+
+    for (var iter_input = 0; iter_input < jumlah_alat; iter_input++) {
+        var input = document.createElement("input")
+        input.name = `${kode_alat}_${iter_input}_keterangan_kompleks`
+        input.id = `${kode_alat}_${iter_input}_keterangan_kompleks`
+        input.type = "text"
+        div.appendChild(input)
+        if (iter_input != jumlah_alat-1) {
+            var br = document.createElement("br")
+            div.appendChild(br)
+        }
+    }
+
+    var div = document.getElementById(`${kode_alat}_div_performa_kompleks`)
+    div.innerHTML = ''
+
+    for (var iter_input = 0; iter_input < jumlah_alat; iter_input++) {
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Jumlah site komponen ${nama_alat} ${iter_input+1}`
+        div.appendChild(h3)
+
+        var select = document.createElement("select")
+        select.name = `${kode_alat}_${iter_input}_jumlah_site_kompleks`
+        select.id = `${kode_alat}_${iter_input}_jumlah_site_kompleks`
+
+        for (var iter_opsi = 1; iter_opsi < 6; iter_opsi++) {
+            var opsi = document.createElement("option")
+            opsi.value = iter_opsi
+            opsi.innerHTML = iter_opsi
+            select.appendChild(opsi)
+        }
+        select.value = default_jumlah_site
+        select.setAttribute('onChange', `set_jumlah_site('${kode_alat}',${iter_input}, ${urutan_alat_kompleks})`)
+        div.appendChild(select)
+
+        var div_inner_sensor = document.createElement("div")
+        div_inner_sensor.style.border = '2px solid black'
+        div_inner_sensor.style.borderRadius = '5px'
+        div_inner_sensor.id = `${kode_alat}_${iter_input}_div_inner_performa_sensor_alat_kompleks`
+        for (var iter_sensor = 0; iter_sensor < list_data_sensor.length; iter_sensor++) {
+            var single_nama_sensor = list_data_sensor[iter_sensor]['Nama_alat']
+            var single_kode_sensor = list_data_sensor[iter_sensor]['Kode_alat']
+
+            var h3 = document.createElement("h3")
+            h3.innerHTML = `Performa ${single_nama_sensor}`
+            div_inner_sensor.appendChild(h3)
+
+            for (var iter_inner_input = 0; iter_inner_input < default_jumlah_site; iter_inner_input++) {
+                var input = document.createElement("input")
+                input.name = `${kode_alat}_${iter_input}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+                input.id = `${kode_alat}_${iter_input}_${single_kode_sensor}_${iter_inner_input}_nilai_performa_kompleks`
+                input.type = 'number'
+                input.min = 0
+                input.max = 100
+                div_inner_sensor.appendChild(input)
+            }
+        }
+
+        div.appendChild(div_inner_sensor)
+    }
+
+}
+
+/*function get_data_kompleks() {
+    console.log('contoh promise')
+}
+
+var promise_init = new Promise(update_set_alat_kompleks)
+promise_init.then(get_data_kompleks) */
+
+update_set_alat_kompleks()
+</script>
+
+
+<script>
+
+document.getElementById('close-btn').addEventListener('click', function() {
+    document.getElementById('overlay').classList.remove('is-visible');
+    document.getElementById('modal').classList.remove('is-visible');
+  });
+
+  document.getElementById('overlay').addEventListener('click', function() {
+    document.getElementById('overlay').classList.remove('is-visible');
+    document.getElementById('modal').classList.remove('is-visible');
+  });
+
+  /*document.getElementById('close-btn_sensor').addEventListener('click', function() {
+    document.getElementById('overlay').classList.remove('is-visible');
+    document.getElementById('modal_sensor').classList.remove('is-visible');
+  });*/
+
+</script>
+
+<script>
+
+function click_site() {
+    var kode = this.options.kode_situs
+    //var nama = dict_kode_nama_alat[kode]
+
+    //console.log('cek nama', kode, nama)
+
+    var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+        var alldata_json
+        var alldata = this.responseText
+        try {
+            alldata_json = JSON.parse(alldata)
+        } catch (err) {
+            //act for null data
+            return
+        }
+
+        if (alldata_json['status'] != "ok") {
+            //act for null data
+            return
+        }
+
+        var alldata_data = alldata_json['data']
+
+        var dict_jumlah_alat = {}
+        var dict_urutan_keterangan = {}
+        var dict_urutan_kategori = {}
+        var dict_urutan_merk = {}
+        var dict_urutan_jumlahsite = {}
+        dict_urutan_performasensor = {}
+        for (var iter_data = 0; iter_data < alldata_data.length; iter_data++) {
+            dict_jumlah_alat[alldata_data[iter_data]['Kode_alat']] += 1
+            if (isNaN(dict_jumlah_alat[alldata_data[iter_data]['Kode_alat']])) {
+                dict_jumlah_alat[alldata_data[iter_data]['Kode_alat']] = 1
+            }
+            var single_urutan = alldata_data[iter_data]['Urutan']
+            if (dict_urutan_keterangan[single_urutan] == undefined) {
+                dict_urutan_keterangan[single_urutan] = {}
+            }
+            if (dict_urutan_kategori[single_urutan] == undefined) {
+                dict_urutan_kategori[single_urutan] = {}
+            }
+            if (dict_urutan_merk[single_urutan] == undefined) {
+                dict_urutan_merk[single_urutan] = {}
+            }
+            if (dict_urutan_jumlahsite[single_urutan] == undefined) {
+                dict_urutan_jumlahsite[single_urutan] = {}
+            }
+            if (dict_urutan_performasensor[single_urutan] == undefined) {
+                dict_urutan_performasensor[single_urutan] = {}
+            }
+            dict_urutan_keterangan[single_urutan][alldata_data[iter_data]['Kode_alat']] = alldata_data[iter_data]['Keterangan']
+            dict_urutan_kategori[single_urutan][alldata_data[iter_data]['Kode_alat']] = alldata_data[iter_data]['Kategori']
+            dict_urutan_merk[single_urutan][alldata_data[iter_data]['Kode_alat']] = alldata_data[iter_data]['Merk']
+            dict_urutan_jumlahsite[single_urutan][alldata_data[iter_data]['Kode_alat']] = alldata_data[iter_data]['Jumlah_site']
+
+            var list_data_performa_sensor = alldata_data[iter_data]['Performa_list']
+            for (var iter_p = 0; iter_p < list_data_performa_sensor.length; iter_p++) {
+                if (iter_p == 0) {
+                    dict_urutan_performasensor[single_urutan][alldata_data[iter_data]['Kode_alat']] = {}
+                }
+                dict_urutan_performasensor[single_urutan][alldata_data[iter_data]['Kode_alat']][list_data_performa_sensor[iter_p]['Kode_alat']] = {}
+                dict_urutan_performasensor[single_urutan][alldata_data[iter_data]['Kode_alat']][list_data_performa_sensor[iter_p]['Kode_alat']]['nama'] = list_data_performa_sensor[iter_p]['Nama_alat']
+                dict_urutan_performasensor[single_urutan][alldata_data[iter_data]['Kode_alat']][list_data_performa_sensor[iter_p]['Kode_alat']]['performa'] = list_data_performa_sensor[iter_p]['Performa']
+            }
+        }
+
+        console.log('cek alldata_data', alldata_data)
+        console.log("cek dict alat", dict_jumlah_alat)
+
+        var keys_alat = Object.keys(dict_jumlah_alat)
+
+        console.log('cek dict baru', dict_urutan_performasensor, dict_jumlah_alat)
+
+        /*var dict_list_kategori_alat = {}
+        for (var iter_data = 0; iter_data < keys_alat.length; alldata_data++) {
+            var single_jumlah = dict_jumlah_alat[keys_alat[iter_data]]
+            for (var iter_data_akses = 0; iter_data_akses < single_jumlah; iter_data_akses++) {
+
+                for () {
+
+                }
+
+            }
+        }*/
+
+        console.log('kode situs dan data', kode, alldata_json, alldata_json['status'])
+
+        var div_status = document.getElementById("modal_status_alat")
+        div_status.innerHTML = ""
+
+        var h3 = document.createElement("h3")
+        h3.innerHTML = `Status Peralatan ${kode}`
+        div_status.appendChild(h3)
+
+        for (var iter_stat_alat = 0; iter_stat_alat < keys_alat.length; iter_stat_alat++) {
+            var single_jumlah = dict_jumlah_alat[keys_alat[iter_data]]
+
+            var table = document.createElement('table')
+            table.style.border = '2px solid black'
+            table.style.margin = '15px'
+            
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Nama alat"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = keys_alat[iter_stat_alat]
+            tr.appendChild(td)
+            table.append(tr)
+
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Jumlah alat"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = dict_jumlah_alat[keys_alat[iter_stat_alat]]
+            tr.appendChild(td)
+            table.append(tr)
+
+            //build string merk
+            var str_merk = ''
+            for (var iter_data_inner = 0; iter_data_inner < dict_jumlah_alat[keys_alat[iter_stat_alat]]; iter_data_inner++) {
+                var single_merk = '-'
+                try {
+                    single_merk = dict_urutan_merk[iter_data_inner][keys_alat[iter_stat_alat]]
+                } catch (err) {
+                    single_merk = '-'
+                }
+                str_merk += single_merk
+                if (iter_data_inner != dict_jumlah_alat[keys_alat[iter_stat_alat]]-1) {
+                    str_merk += '/'
+                }
+            }
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Merk alat"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = str_merk
+            tr.appendChild(td)
+            table.append(tr)
+
+            //build string kategori
+            var str_kategori = ''
+            for (var iter_data_inner = 0; iter_data_inner < dict_jumlah_alat[keys_alat[iter_stat_alat]]; iter_data_inner++) {
+                var single_kategori = '-'
+                try {
+                    single_kategori = dict_urutan_kategori[iter_data_inner][keys_alat[iter_stat_alat]]
+                } catch (err) {
+                    single_kategori = '-'
+                }
+                str_kategori += single_kategori
+                if (iter_data_inner != dict_jumlah_alat[keys_alat[iter_stat_alat]]-1) {
+                    str_kategori += '/'
+                }
+            }
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Kategori alat"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = str_kategori
+            tr.appendChild(td)
+            table.append(tr)
+
+            //build string keterangan
+            var str_keterangan = ''
+            for (var iter_data_inner = 0; iter_data_inner < dict_jumlah_alat[keys_alat[iter_stat_alat]]; iter_data_inner++) {
+                var single_keterangan = '-'
+                try {
+                    single_keterangan = dict_urutan_keterangan[iter_data_inner][keys_alat[iter_stat_alat]]
+                } catch (err) {
+                    single_keterangan = '-'
+                }
+                str_keterangan += single_keterangan
+                if (iter_data_inner != dict_jumlah_alat[keys_alat[iter_stat_alat]]-1) {
+                    str_keterangan += '/'
+                }
+            }
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Keterangan alat"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = str_keterangan
+            tr.appendChild(td)
+            table.append(tr)
+
+            //build string jumlah site
+            var str_jumlah_site = ''
+            for (var iter_data_inner = 0; iter_data_inner < dict_jumlah_alat[keys_alat[iter_stat_alat]]; iter_data_inner++) {
+                var single_jumlah_site= '-'
+                try {
+                    single_jumlah_site = dict_urutan_jumlahsite[iter_data_inner][keys_alat[iter_stat_alat]]
+                } catch (err) {
+                    single_jumlah_site = '-'
+                }
+                str_jumlah_site += single_jumlah_site
+                if (iter_data_inner != dict_jumlah_alat[keys_alat[iter_stat_alat]]-1) {
+                    str_jumlah_site += '/'
+                }
+            }
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "Jumlah site"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = str_jumlah_site
+            tr.appendChild(td)
+            table.append(tr)
+
+            var tr = document.createElement('tr')
+            var td = document.createElement('td')
+            td.innerHTML = "<b>Performa</b>"
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            var td = document.createElement('td')
+            td.innerHTML = ''
+            tr.appendChild(td)
+            table.append(tr)
+
+            //for performa
+            var all_stat_performa = {}
+            for (var iter_data_inner = 0; iter_data_inner < dict_jumlah_alat[keys_alat[iter_stat_alat]]; iter_data_inner++) {
+                var stat_performa = []
+                try {
+                    stat_performa = dict_urutan_performasensor[iter_data_inner][keys_alat[iter_stat_alat]]
+                } catch (err) {
+                    break
+                }
+                var list_stat_nama = Object.keys(stat_performa)
+                for (var iter_p_inner = 0; iter_p_inner < list_stat_nama.length; iter_p_inner++) {
+                    var nama_sensor_inner = stat_performa[list_stat_nama[iter_p_inner]]['nama']
+                    var list_nilai_p = stat_performa[list_stat_nama[iter_p_inner]]['performa']
+                    //build string nilai performa sensor
+                    var frag_str_performa = ''
+                    for (var iter_p_list = 0; iter_p_list < list_nilai_p.length; iter_p_list++) {
+                        frag_str_performa += list_nilai_p[iter_p_list]
+                        if (iter_p_list != list_nilai_p.length-1) {
+                            frag_str_performa += ','
+                        }
+                    }
+                    if (all_stat_performa[list_stat_nama[iter_p_inner]] == undefined) {
+                        all_stat_performa[list_stat_nama[iter_p_inner]] = frag_str_performa
+                    } else {
+                        all_stat_performa[list_stat_nama[iter_p_inner]] += '/'+frag_str_performa
+                    }
+                }
+            }
+
+            var all_keys_sensor = Object.keys(all_stat_performa)
+            for (var iter_key = 0; iter_key < all_keys_sensor.length; iter_key++) {
+                var tr = document.createElement('tr')
+                var td = document.createElement('td')
+                td.innerHTML = all_keys_sensor[iter_key]
+                tr.appendChild(td)
+                var td = document.createElement('td')
+                td.innerHTML = ''
+                tr.appendChild(td)
+                var td = document.createElement('td')
+                td.innerHTML = all_stat_performa[all_keys_sensor[iter_key]]
+                tr.appendChild(td)
+                table.append(tr)
+            }
+
+            //console.log('cek str performa', all_stat_performa)
+
+            //console.log('cek uji', dict_urutan_performasensor[iter_stat_alat][keys_alat[iter_stat_alat]], iter_stat_alat, keys_alat[iter_stat_alat])
+            //console.log("check dict performa", dict_urutan_performasensor, iter_stat_alat, keys_alat[iter_stat_alat])
+            //var all_keys_sensor = Object.keys(dict_urutan_performasensor[iter_stat_alat][keys_alat[iter_stat_alat]])
+            //console.log('semua kunci sensor', all_keys_sensor)
+            
+
+            div_status.appendChild(table)
+        }
+
+
+
+
+
+//        var table_data = document.createElement("table")
+//        table_data.style.border = '2px solid black'
+//        
+//        var tr = document.createElement("tr")
+//        var td = document.createElement("td")
+//        td.innerHTML = 
+
+
+        document.getElementById('overlay').classList.add('is-visible')
+        document.getElementById('modal').classList.add('is-visible')
+    }
+
+    xhttp.open("GET", `get_data_alat/${kode}`, true);
+	xhttp.send();
+}
+
+</script>
+
+<script>
+    function update_to_db() {
+        var send_data = {}
+        var situs = document.getElementById('situs').value
+        send_data['situs'] = situs
+        send_data['alat'] = []
+
+        for (var iter_alldata = 0; iter_alldata < alldata_alat.length; iter_alldata++) {
+            var data = {}
+            var single_alldata = alldata_alat[iter_alldata]
+            var single_all_sensor = single_alldata['List_sensor']
+            var jumlah_alat = 1
+            
+            try {
+                jumlah_alat = parseInt(document.getElementById(`${single_alldata['Kode_alat']}_jumlah_kompleks`).value)
+            } catch (err) {
+                jumlah_alat = 1
+            }
+            data['jumlah_alat'] = jumlah_alat
+            data['kode_alat'] = single_alldata['Kode_alat']
+            data['nama_alat'] = single_alldata['Nama_alat']
+
+            var arr_merk = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_merk = ''
+                try {
+                    single_merk = document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_merk_kompleks`).value
+                } catch (err) {
+                    single_merk = ''
+                }
+                arr_merk.push(single_merk)
+            }
+            data['merk'] = arr_merk
+
+            var arr_kategori = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_kategori = ''
+                try {
+                    single_kategori = document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_kategori_kompleks`).value
+                } catch (err) {
+                    single_kategori = ''
+                }
+                arr_kategori.push(single_kategori)
+            }
+            data['kategori'] = arr_kategori
+
+            var arr_status = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_status = ''
+                try {
+                    single_status = document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_status_kompleks`).value
+                } catch (err) {
+                    single_status = 'off'
+                }
+                arr_status.push(single_status)
+            }
+            data['status'] = arr_status
+
+            var arr_keterangan = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_keterangan = ''
+                try {
+                    single_keterangan = document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_keterangan_kompleks`).value
+                } catch (err) {
+                    single_keterangan = ''
+                }
+                arr_keterangan.push(single_keterangan)
+            }
+            data['keterangan'] = arr_keterangan
+            
+            var arr_jumlah_site = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_jumlah_site = 0
+                try {
+                    single_jumlah_site = parseInt(document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_jumlah_site_kompleks`).value)
+                } catch (err) {
+                    single_jumlah_site = 0
+                }
+                arr_jumlah_site.push(single_jumlah_site)
+            }
+            data['jumlah_site'] = arr_jumlah_site
+
+            var arr_dict_sensor = []
+            for (var iter_jumlah = 0; iter_jumlah < jumlah_alat; iter_jumlah++) {
+                var single_jumlah_site = arr_jumlah_site[iter_jumlah]
+                var single_arr_dict_sensor = []
+                for (var iter_single_all_sensor = 0; iter_single_all_sensor < single_all_sensor.length; iter_single_all_sensor++) {
+                    var dict_sensor = {}
+                    var single_kode_sensor = single_all_sensor[iter_single_all_sensor]['Kode_alat']
+                    var single_nama_sensor = single_all_sensor[iter_single_all_sensor]['Nama_alat']
+                    dict_sensor['Kode_alat'] = single_kode_sensor
+                    dict_sensor['Nama_alat'] = single_nama_sensor
+                    var list_performa_sensor = []
+                    for (var iter_jumlah_site = 0; iter_jumlah_site < single_jumlah_site; iter_jumlah_site++) {
+                        var single_performa = 0
+                        try {
+                            single_performa = parseInt(document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_${single_kode_sensor}_${iter_jumlah_site}_nilai_performa_kompleks`).value)
+                        } catch (err) {
+                            single_performa = 0
+                        }
+                        if (isNaN(single_performa)) {
+                            single_performa = 0
+                        }
+                        //single_performa = parseInt(document.getElementById(`${single_alldata['Kode_alat']}_${iter_jumlah}_${single_kode_sensor}_${iter_jumlah_site}_nilai_performa_kompleks`).value)
+                        list_performa_sensor.push(single_performa)
+                        //
+                    }
+                    dict_sensor['performa'] = list_performa_sensor
+                    single_arr_dict_sensor.push(dict_sensor)
+                }
+                arr_dict_sensor.push(single_arr_dict_sensor)
+            }
+            data['performa'] = arr_dict_sensor
+
+            //final act
+            send_data['alat'].push(data)
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "upload_data_alat", true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify(send_data));
+        console.log('fire', send_data)
+    }
+</script>
+
+</body>
+</html>

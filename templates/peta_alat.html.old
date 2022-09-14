@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+	
+	<title>Lapor Alat</title>
+
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="shortcut icon" type="image/x-icon" href="static/favicon.ico" />
+	
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
+	<script src='https://kit.fontawesome.com/a076d05399.js'></script>
+	
+	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+
+	<!-- for datepicker -->
+	<link href="static_peralatan/css/jquery-ui.css" rel="stylesheet">
+	<link href="static_peralatan/css/date.css" rel="stylesheet">
+
+	
+</head>
+<style>
+html, body {
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+#mapid {
+  width: auto;
+  height: 100%;
+}
+div.layer:hover {
+	display: block;
+	background-color: #60609f;
+	colour: #000;    
+}
+
+</style>
+ <link rel="stylesheet" href="static_peralatan/css/leaflet-sidebar.css" />
+<body>
+
+<!-- optionally define the sidebar content via HTML markup -->
+	<div id="sidebar" class="leaflet-sidebar collapsed">
+
+		<!-- nav tabs -->
+		<div class="leaflet-sidebar-tabs">
+			<!-- top aligned tabs -->
+			<ul role="tablist">
+				<li><a href="#home" role="tab"><i class="fa fa-gear"></i></a></li> <!-- fa fa-info-circle -->
+				<li><a href="#autopan" role="tab"><i class="fa fa-database"></i></a></li>
+				<li><a href="logout"><i class="fas fa-sign-out-alt"></i></a></li>
+			</ul>
+		</div>
+
+		<!-- panel content -->
+		<div class="leaflet-sidebar-content">
+			<div class="leaflet-sidebar-pane" id="home" style="overflow-x:scroll">
+				<h1 class="leaflet-sidebar-header">
+					Update
+					<span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span>
+				</h1>
+
+				<h2 id="nama_stasiun">Update Data Peralatan</h2>
+				<h3 id="nama_stasiun">Situs</h3>
+				<select name="situs" id="situs" onchange="auto_fill_onchange();">
+					{{range .all_situs}}
+					<option value="{{.Kode_situs}}">{{.Kode_situs}} - {{.Nama_situs}}</option>
+					{{end}}
+				</select>
+				{{range .all_jenis_alat}}
+				<div class="row" style="box-shadow:inset 0 0 0 1px;padding:5px;margin:5px">
+					<h3>Jumlah Site {{.Nama_alat}}</h3>
+					<select name="{{.Kode_alat}}_jumlah" id="{{.Kode_alat}}_jumlah" onchange="set_jumlah_site('{{.Kode_alat}}')">
+						<option value="0">0</option>
+						<option value="1">1</option>
+						<option value="2">2</option>
+						<option value="3">3</option>
+						<option value="4">4</option>
+						<option value="5">5</option>
+					</select>
+					<div id="{{.Kode_alat}}_list_keterangan">
+
+					</div>
+					<h3>Status {{.Nama_alat}}</h3>
+					<select name="{{.Kode_alat}}_status" id="{{.Kode_alat}}_status">
+						<option value="none">Tidak ada</option>
+						<option value="on">Nyala (On)</option>
+						<option value="off">Mati (Off)</option>
+					</select>
+					<h3>Keterangan {{.Nama_alat}}</h3>
+					<input id="{{.Kode_alat}}_keterangan" name="{{.Kode_alat}}_keterangan">
+				</div>
+				{{end}}
+				<button id="update" onclick="update()" type="submit" class="btn btn-link text-primary">Update</button>
+				<h3 id="status_update"></h3>
+
+			</div>
+
+			<div class="leaflet-sidebar-pane" id="autopan">
+				<h1 class="leaflet-sidebar-header">
+					Extract Data
+					<span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span>
+				</h1>
+				{{if .is_admin}}
+				<div>
+					<h2>Ekstrak Data Historis Keadaan Peralatan</h2>
+				</div>
+				<div> 
+					<p id="text">Pilih awal waktu</p> 
+					 <input class="form-control" type="text" id="datepicker_awal_waktu"> 
+				</div>
+				<div> 
+					<p id="text">Pilih akhir waktu</p> 
+					 <input class="form-control" type="text" id="datepicker_akhir_waktu"> 
+				</div>
+				<br>
+				<div>
+					<button id="button-addon1" type="submit" onclick="extract_data();" class="btn btn-link text-primary">EKstrak</button>
+				</div>
+				<div>
+					<a id="a_link_extract_data" href=""><p id="link_extract_data"></p></a>
+				</div>
+				<div>
+					<h2>Ekstrak Data Peralatan Situasi Terkini</h2>
+				</div>
+				<div>
+					<button id="button-addon1" type="submit" onclick="extract_data_terbaru();" class="btn btn-link text-primary">EKstrak</button>
+				</div>
+				<div>
+					<a id="a_link_extract_data_terbaru" href=""><p id="link_extract_data_terbaru"></p></a>
+				</div>
+				{{else}}
+					<h1>ONLY FOR ADMIN</h1>
+				{{end}}
+			</div>
+
+			<div class="leaflet-sidebar-pane" id="messages">
+				<h1 class="leaflet-sidebar-header">Messages<span class="leaflet-sidebar-close"><i class="fa fa-caret-left"></i></span></h1>
+			</div>
+		</div>
+	</div>
+	
+<div id="mapid"></div>
+<div id="daftar_alat" style="visibility:hidden;display:inline;">{{range .all_jenis_alat}}{{.Kode_alat}},{{end}}</div>
+<div id="daftar_situs" style="visibility:hidden;display:inline;">{{range .all_situs}}{{.Kode_situs}},{{end}}</div>
+
+</body>
+
+
+<!-- datepicker -->
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+<script src="static_peralatan/js/leaflet-sidebar.js"></script>
+<script src="static_peralatan/js/filling_isian.js"></script>
+<script src="static_peralatan/js/update_peta.js"></script>
+<script src="static_peralatan/js/update_data.js"></script>
+<script src="static_peralatan/js/extract_data_terbaru.js"></script>
+<script src="static_peralatan/js/extract_data.js"></script>
+<script src="static_peralatan/js/date_picker_kecil.js"></script>
+
+
+
+</html>

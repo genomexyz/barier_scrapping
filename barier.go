@@ -88,6 +88,27 @@ func setupRouter() *gin.Engine {
 			c.Redirect(http.StatusFound, "/index")
 		}
 	})
+	
+	r.GET("/get_data", func(c *gin.Context) {
+		allowed_client := []string{"mozilla", "applewebkit", "chrome", "safari"}
+
+		ua := c.Request.Header.Get("User-Agent")
+		ua_lowercase := strings.ToLower(ua)
+		allow := false
+		for i := range allowed_client {
+			if strings.Contains(ua_lowercase, allowed_client[i]) {
+				allow = true
+				break
+			}
+		}
+		if !allow {
+			c.String(http.StatusOK, "not allowed to scrap!\n")
+			return
+		}
+		c.HTML(http.StatusOK, "MOCK_DATA.json", nil)
+		return
+	})
+
 
 	return r
 }
